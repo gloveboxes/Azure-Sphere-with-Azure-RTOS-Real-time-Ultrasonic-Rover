@@ -56,7 +56,7 @@ int main(void)
 
 /* Define what the initial system looks like.  */
 
-void    tx_application_define(void* first_unused_memory)
+void	tx_application_define(void* first_unused_memory)
 {
 	CHAR* pointer;
 
@@ -74,7 +74,7 @@ void    tx_application_define(void* first_unused_memory)
 }
 
 
-static int gpio_output(u8 gpio_no, u8 level)
+static	int gpio_output(u8 gpio_no, u8 level)
 {
 	int ret;
 
@@ -95,7 +95,7 @@ static int gpio_output(u8 gpio_no, u8 level)
 	return 0;
 }
 
-void SetDistanceIndicator(int centimeters)
+void	set_distance_indicator(int centimeters)
 {
 	static enum LEDS previous_led = RED;
 
@@ -112,7 +112,7 @@ void SetDistanceIndicator(int centimeters)
 
 // https://embeddedartistry.com/blog/2017/02/17/implementing-malloc-with-threadx/
 // overrides for malloc and free required for srand and rand
-void* malloc(size_t size)
+void	*malloc(size_t size)
 {
 	void* ptr = NULL;
 
@@ -132,7 +132,7 @@ void* malloc(size_t size)
 	return ptr;
 }
 
-void free(void* ptr)
+void	free(void* ptr)
 {
 	if (ptr)
 	{
@@ -142,104 +142,104 @@ void free(void* ptr)
 	}
 }
 
-void WriteReg32(uintptr_t baseAddr, size_t offset, uint32_t value)
+void	write_reg32(uintptr_t baseAddr, size_t offset, uint32_t value)
 {
 	*(volatile uint32_t*)(baseAddr + offset) = value;
 }
 
-uint32_t ReadReg32(uintptr_t baseAddr, size_t offset)
+uint32_t	read_reg32(uintptr_t baseAddr, size_t offset)
 {
 	return *(volatile uint32_t*)(baseAddr + offset);
 }
 
-void Gpt3_WaitUs(int microseconds)
+void	gpt3_wait_microseconds(int microseconds)
 {
 	// GPT3_INIT = initial counter value
-	WriteReg32(GPT_BASE, 0x54, 0x0);
+	write_reg32(GPT_BASE, 0x54, 0x0);
 
 	// GPT3_CTRL
 	uint32_t ctrlOn = 0x0;
 	ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
 	ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
-	WriteReg32(GPT_BASE, 0x50, ctrlOn);
+	write_reg32(GPT_BASE, 0x50, ctrlOn);
 
 	// GPT3_CNT
-	while (ReadReg32(GPT_BASE, 0x58) < microseconds)
+	while (read_reg32(GPT_BASE, 0x58) < microseconds)
 	{
 		// empty.
 	}
 
 	// GPT_CTRL -> disable timer
-	WriteReg32(GPT_BASE, 0x50, 0x0);
+	write_reg32(GPT_BASE, 0x50, 0x0);
 }
 
-bool readInput(u8 pin)
+bool	read_input(u8 pin)
 {
 	os_hal_gpio_data value = 0;
 	mtk_os_hal_gpio_get_input(pin, &value);
 	return value == OS_HAL_GPIO_DATA_HIGH;
 }
 
-float get_distance(u8 pin, unsigned long timeoutMicroseconds)
+float	get_distance(u8 pin, unsigned long timeoutMicroseconds)
 {
 	uint32_t pulseBegin, pulseEnd;
 
 	mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_OUTPUT);	// set for output
 	mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_LOW);		// pull low
-	Gpt3_WaitUs(2);
+	gpt3_wait_microseconds(2);
 
 	mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_HIGH);		// pull high
-	Gpt3_WaitUs(5);
+	gpt3_wait_microseconds(5);
 
 	// GPT3_CTRL - starts microsecond resolution clock
 	uint32_t ctrlOn = 0x0;
 	ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
 	ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
-	WriteReg32(GPT_BASE, 0x50, ctrlOn);
+	write_reg32(GPT_BASE, 0x50, ctrlOn);
 
 	mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_INPUT);	// set for input
 
-	while (readInput(pin))		// wait for any previous pulse to end
+	while (read_input(pin))		// wait for any previous pulse to end
 	{
-		if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
 		{
-			WriteReg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
+			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
 			return NAN;
 		}
 	}
 
-	while (!readInput(pin))		// wait for the pulse to start
+	while (!read_input(pin))		// wait for the pulse to start
 	{
-		pulseBegin = ReadReg32(GPT_BASE, 0x58);
-		if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+		pulseBegin = read_reg32(GPT_BASE, 0x58);
+		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
 		{
-			WriteReg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
+			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
 			return NAN;
 		}
 	}
 
-	pulseBegin = ReadReg32(GPT_BASE, 0x58);
+	pulseBegin = read_reg32(GPT_BASE, 0x58);
 
-	while (readInput(pin))		// wait for the pulse to stop
+	while (read_input(pin))		// wait for the pulse to stop
 	{
-		if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
 		{
-			WriteReg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
+			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
 			return NAN;
 		}
 	}
 
-	pulseEnd = ReadReg32(GPT_BASE, 0x58);
+	pulseEnd = read_reg32(GPT_BASE, 0x58);
 	
-	WriteReg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
+	write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
 
 	return (pulseEnd - pulseBegin) / 58.0; //  (29 / 2);
 }
 
-void    thread_measure_distance_entry(ULONG thread_input)
+void	thread_measure_distance_entry(ULONG thread_input)
 {
 
-	Gpt3_WaitUs(5000000);
+	gpt3_wait_microseconds(5000000);
 
 	while (true)
 	{
@@ -248,7 +248,7 @@ void    thread_measure_distance_entry(ULONG thread_input)
 
 		if (!isnan(distance_left))
 		{
-			SetDistanceIndicator((int)distance_left);
+			set_distance_indicator((int)distance_left);
 			newDistanceLeft = distance_left;
 			newDataReady = true;
 		}

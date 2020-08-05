@@ -8,10 +8,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "os_hal_gpio.h"
+#include "Ultrasonic/ultransonic.h"
 
 #include "hw/azure_sphere_learning_path.h"
-
-static const uintptr_t GPT_BASE = 0x21030000;
 
 bool HLAppReady = false;
 float distance_left, distance_right, newDistanceLeft, newDistanceRight;
@@ -24,8 +23,15 @@ enum LEDS
 	BLUE
 };
 
-static enum LEDS current_led = RED;
-static int leds[] = { LED_RED, LED_GREEN, LED_BLUE };
+typedef struct ULTRASONIC_SENSOR
+{
+	float centimeters;
+	enum LEDS previous_led;
+	int LEDs[];
+} ULTRASONIC_SENSOR;
+
+ULTRASONIC_SENSOR leftSensor = { .LEDs = { LED_RED, LED_GREEN, LED_BLUE } };
+ULTRASONIC_SENSOR rightSensor = { .LEDs = { LED_RED_RIGHT, LED_GREEN_RIGHT, LED_BLUE_RIGHT } };
 
 
 #define DEMO_STACK_SIZE         1024
@@ -43,7 +49,7 @@ UCHAR                   memory_area[DEMO_BYTE_POOL_SIZE];
 
 
 /* Define thread prototypes.  */
-void    thread_measure_distance_entry(ULONG thread_input);
+void thread_measure_distance_entry(ULONG thread_input);
 
 
 int main(void)
@@ -56,7 +62,7 @@ int main(void)
 
 /* Define what the initial system looks like.  */
 
-void	tx_application_define(void* first_unused_memory)
+void tx_application_define(void* first_unused_memory)
 {
 	CHAR* pointer;
 
@@ -74,7 +80,7 @@ void	tx_application_define(void* first_unused_memory)
 }
 
 
-static	int gpio_output(u8 gpio_no, u8 level)
+int gpio_output(u8 gpio_no, u8 level)
 {
 	int ret;
 
@@ -95,24 +101,33 @@ static	int gpio_output(u8 gpio_no, u8 level)
 	return 0;
 }
 
-void	set_distance_indicator(int centimeters)
+void set_distance_indicator(ULTRASONIC_SENSOR *sensor)
 {
-	static enum LEDS previous_led = RED;
+	enum LEDS current_led = RED;
 
-	current_led = centimeters > 20 ? GREEN : centimeters > 10 ? BLUE : RED;
-
-	if (previous_led != current_led)
+	if (!isnan(sensor->centimeters))
 	{
-		gpio_output(leds[(int)previous_led], true); // turn off old current colour
-		previous_led = current_led;
-	}
+		current_led = sensor->centimeters > 20.0 ? GREEN : sensor->centimeters > 10.0 ? BLUE : RED;
+		if (sensor->previous_led != current_led)
+		{
+			gpio_output(sensor->LEDs[(int)sensor->previous_led], true); // turn off old current colour
+			sensor->previous_led = current_led;
+		}
 
-	gpio_output(leds[(int)current_led], false);
+		gpio_output(sensor->LEDs[(int)current_led], false);
+	}
+	else
+	{
+		for (size_t i = 0; i < 3; i++)
+		{
+			gpio_output(sensor->LEDs[i], true);
+		}
+	}
 }
 
 // https://embeddedartistry.com/blog/2017/02/17/implementing-malloc-with-threadx/
 // overrides for malloc and free required for srand and rand
-void	*malloc(size_t size)
+void *malloc(size_t size)
 {
 	void* ptr = NULL;
 
@@ -132,7 +147,7 @@ void	*malloc(size_t size)
 	return ptr;
 }
 
-void	free(void* ptr)
+void free(void* ptr)
 {
 	if (ptr)
 	{
@@ -142,124 +157,18 @@ void	free(void* ptr)
 	}
 }
 
-void	write_reg32(uintptr_t baseAddr, size_t offset, uint32_t value)
+
+
+void thread_measure_distance_entry(ULONG thread_input)
 {
-	*(volatile uint32_t*)(baseAddr + offset) = value;
-}
-
-uint32_t	read_reg32(uintptr_t baseAddr, size_t offset)
-{
-	return *(volatile uint32_t*)(baseAddr + offset);
-}
-
-void	gpt3_wait_microseconds(int microseconds)
-{
-	// GPT3_INIT = initial counter value
-	write_reg32(GPT_BASE, 0x54, 0x0);
-
-	// GPT3_CTRL
-	uint32_t ctrlOn = 0x0;
-	ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
-	ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
-	write_reg32(GPT_BASE, 0x50, ctrlOn);
-
-	// GPT3_CNT
-	while (read_reg32(GPT_BASE, 0x58) < microseconds)
-	{
-		// empty.
-	}
-
-	// GPT_CTRL -> disable timer
-	write_reg32(GPT_BASE, 0x50, 0x0);
-}
-
-bool	read_input(u8 pin)
-{
-	os_hal_gpio_data value = 0;
-	mtk_os_hal_gpio_get_input(pin, &value);
-	return value == OS_HAL_GPIO_DATA_HIGH;
-}
-
-float	get_distance(u8 pin, unsigned long timeoutMicroseconds)
-{
-	uint32_t pulseBegin, pulseEnd;
-
-	mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_OUTPUT);	// set for output
-	mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_LOW);		// pull low
-	gpt3_wait_microseconds(2);
-
-	mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_HIGH);		// pull high
-	gpt3_wait_microseconds(5);
-
-	// GPT3_CTRL - starts microsecond resolution clock
-	uint32_t ctrlOn = 0x0;
-	ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
-	ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
-	write_reg32(GPT_BASE, 0x50, ctrlOn);
-
-	mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_INPUT);	// set for input
-
-	while (read_input(pin))		// wait for any previous pulse to end
-	{
-		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
-		{
-			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
-			return NAN;
-		}
-	}
-
-	while (!read_input(pin))		// wait for the pulse to start
-	{
-		pulseBegin = read_reg32(GPT_BASE, 0x58);
-		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
-		{
-			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
-			return NAN;
-		}
-	}
-
-	pulseBegin = read_reg32(GPT_BASE, 0x58);
-
-	while (read_input(pin))		// wait for the pulse to stop
-	{
-		if (read_reg32(GPT_BASE, 0x58) > timeoutMicroseconds)
-		{
-			write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
-			return NAN;
-		}
-	}
-
-	pulseEnd = read_reg32(GPT_BASE, 0x58);
-	
-	write_reg32(GPT_BASE, 0x50, 0x0);	// GPT_CTRL -> disable timer
-
-	return (pulseEnd - pulseBegin) / 58.0; //  (29 / 2);
-}
-
-void	thread_measure_distance_entry(ULONG thread_input)
-{
-
-	gpt3_wait_microseconds(5000000);
-
 	while (true)
 	{
-		distance_left = get_distance(HCSR04_LEFT, 3000);
-		distance_right = get_distance(HCSR04_RIGHT, 3000);
+		leftSensor.centimeters = lp_get_distance(HCSR04_LEFT, 3000);
+		set_distance_indicator(&leftSensor);
 
-		if (!isnan(distance_left))
-		{
-			set_distance_indicator((int)distance_left);
-			newDistanceLeft = distance_left;
-			newDataReady = true;
-		}
-		else
-		{
-			for (size_t i = 0; i < 3; i++)
-			{
-				gpio_output(leds[i], true);
-			}
-		}
+		rightSensor.centimeters = lp_get_distance(HCSR04_RIGHT, 3000);
+		set_distance_indicator(&rightSensor);
 
-		tx_thread_sleep(1);  // for some reason this is hanging
+		tx_thread_sleep(1);
 	}
 }

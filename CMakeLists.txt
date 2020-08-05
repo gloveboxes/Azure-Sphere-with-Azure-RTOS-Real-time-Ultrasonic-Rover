@@ -18,7 +18,7 @@ add_executable (${PROJECT_NAME}
 	./MT3620_lib/OS_HAL/src/os_hal_gpio.c
 	./MT3620_lib/OS_HAL/src/os_hal_uart.c
     ./MT3620_lib/OS_HAL/src/os_hal_dma.c
-	)
+	 "./Ultrasonic/ultrasonic.c")
 
 include_directories(${PROJECT_NAME} PUBLIC
                     ./)

@@ -9,6 +9,9 @@
       "$LED_RED",
       "$LED_GREEN",
       "$LED_BLUE",
+      "$LED_RED_RIGHT",
+      "$LED_GREEN_RIGHT",
+      "$LED_BLUE_RIGHT",
       "$HCSR04_LEFT",
       "$HCSR04_RIGHT"
     ]

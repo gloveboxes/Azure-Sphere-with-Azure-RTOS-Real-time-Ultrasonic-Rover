@@ -49,6 +49,8 @@ void SystmTick_Handler(void)
 	extern void SysTick_Handler(void);
 	SysTick_Handler();
 	#endif
+    extern void SysTick_Handler(void);
+    SysTick_Handler();
 }
 
 int NVIC_Register(int irqn, NVIC_IRQ_Handler handler)

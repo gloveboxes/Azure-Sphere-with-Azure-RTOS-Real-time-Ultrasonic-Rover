@@ -6,6 +6,9 @@
   "CmdArgs": [],
   "Capabilities": {
     "Gpio": [
+      "$LED_RED",
+      "$LED_GREEN",
+      "$LED_BLUE",
       "$HCSR04_LEFT",
       "$HCSR04_RIGHT"
     ]

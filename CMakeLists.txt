@@ -27,7 +27,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                            ./MT3620_lib/OS_HAL/inc
                            ./)
 
-#add_subdirectory(mt3620_lib)
 add_subdirectory(./MT3620_lib/MT3620_M4_Driver ./lib/MT3620_M4_Driver)
 add_subdirectory(tx)
 
@@ -38,6 +37,8 @@ set_target_properties (${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${PROJECT_SOURCE_
 
 # Add MakeImage post-build command
 # include ("${AZURE_SPHERE_MAKE_IMAGE_FILE}")
+
+azsphere_target_hardware_definition(${PROJECT_NAME} TARGET_DIRECTORY "./HardwareDefinitions/mt3620_rdb" TARGET_DEFINITION "azure_sphere_learning_path.json")
 
 azsphere_target_add_image_package(${PROJECT_NAME})
 

@@ -5,7 +5,10 @@
   "EntryPoint": "/bin/app",
   "CmdArgs": [],
   "Capabilities": {
-    "Uart": [ "ISU0" ]
+    "Gpio": [
+      "$HCSR04_LEFT",
+      "$HCSR04_RIGHT"
+    ]
   },
   "ApplicationType": "RealTimeCapable"
 }

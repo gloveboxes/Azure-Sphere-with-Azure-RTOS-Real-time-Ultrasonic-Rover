@@ -4,6 +4,15 @@
 
 #include "tx_api.h"
 #include "printf.h"
+#include <math.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "os_hal_gpio.h"
+
+#include "hw/azure_sphere_learning_path.h"
+
+static const uintptr_t GPT_BASE = 0x21030000;
+float distance_left;
 
 #define DEMO_STACK_SIZE         1024
 #define DEMO_BYTE_POOL_SIZE     9120
@@ -13,6 +22,7 @@
 
 /* Define the ThreadX object control blocks...  */
 
+TX_THREAD               thread_measure_distance;
 TX_THREAD               thread_0;
 TX_THREAD               thread_1;
 TX_THREAD               thread_2;
@@ -46,6 +56,7 @@ ULONG                   thread_7_counter;
 
 /* Define thread prototypes.  */
 
+void    thread_measure_distance_entry(ULONG thread_input);
 void    thread_0_entry(ULONG thread_input);
 void    thread_1_entry(ULONG thread_input);
 void    thread_2_entry(ULONG thread_input);
@@ -89,6 +100,9 @@ CHAR    *pointer;
 
     /* Allocate the stack for thread 1.  */
     tx_byte_allocate(&byte_pool_0, (VOID **) &pointer, DEMO_STACK_SIZE, TX_NO_WAIT);
+
+    //tx_thread_create(&thread_measure_distance, "thread measure distance", thread_measure_distance_entry, 0,
+    //    pointer, DEMO_STACK_SIZE, 1, 1, TX_NO_TIME_SLICE, TX_AUTO_START);
 
     /* Create threads 1 and 2. These threads pass information through a ThreadX 
        message queue.  It is also interesting to note that these threads have a time
@@ -172,6 +186,131 @@ CHAR    *pointer;
     tx_block_release(pointer);
 }
 
+// https://embeddedartistry.com/blog/2017/02/17/implementing-malloc-with-threadx/
+// overrides for malloc and free required for srand and rand
+void* malloc(size_t size)
+{
+    void* ptr = NULL;
+
+    if (size > 0)
+    {
+        // We simply wrap the threadX call into a standard form
+        uint8_t r = tx_byte_allocate(&byte_pool_0, &ptr, size,
+            TX_WAIT_FOREVER);
+
+        if (r != TX_SUCCESS)
+        {
+            ptr = NULL;
+        }
+    }
+    //else NULL if there was no size
+
+    return ptr;
+}
+
+void free(void* ptr)
+{
+    if (ptr)
+    {
+        //We simply wrap the threadX call into a standard form
+        //uint8_t r = tx_byte_release(ptr);
+        tx_byte_release(ptr);
+    }
+}
+
+
+void WriteReg32(uintptr_t baseAddr, size_t offset, uint32_t value)
+{
+    *(volatile uint32_t*)(baseAddr + offset) = value;
+}
+
+uint32_t ReadReg32(uintptr_t baseAddr, size_t offset)
+{
+    return *(volatile uint32_t*)(baseAddr + offset);
+}
+
+void Gpt3_WaitUs(int microseconds)
+{
+    // GPT3_INIT = initial counter value
+    WriteReg32(GPT_BASE, 0x54, 0x0);
+
+    // GPT3_CTRL
+    uint32_t ctrlOn = 0x0;
+    ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
+    ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
+    WriteReg32(GPT_BASE, 0x50, ctrlOn);
+
+    // GPT3_CNT
+    while (ReadReg32(GPT_BASE, 0x58) < microseconds)
+    {
+        // empty.
+    }
+
+    // GPT_CTRL -> disable timer
+    WriteReg32(GPT_BASE, 0x50, 0x0);
+}
+
+bool readInput(u8 pin)
+{
+    os_hal_gpio_data value = 0;
+    mtk_os_hal_gpio_get_input(pin, &value);
+    return value == OS_HAL_GPIO_DATA_HIGH;
+}
+
+float get_distance(u8 pin, unsigned long timeoutMicroseconds)
+{
+    uint32_t pulseBegin, pulseEnd;
+
+    mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_OUTPUT);	// set for output
+    mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_LOW);		// pull low
+    Gpt3_WaitUs(2);
+
+    mtk_os_hal_gpio_set_output(pin, OS_HAL_GPIO_DATA_HIGH);		// pull high
+    Gpt3_WaitUs(5);
+
+    // GPT3_CTRL - starts microsecond resolution clock
+    uint32_t ctrlOn = 0x0;
+    ctrlOn |= (0x19) << 16; // OSC_CNT_1US (default value)
+    ctrlOn |= 0x1;          // GPT3_EN = 1 -> GPT3 enabled
+    WriteReg32(GPT_BASE, 0x50, ctrlOn);
+
+    mtk_os_hal_gpio_set_direction(pin, OS_HAL_GPIO_DIR_INPUT);	// set for input
+
+    while (readInput(pin))		// wait for any previous pulse to end
+    {
+        if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+        {
+            return NAN;
+        }
+    }
+
+    while (!readInput(pin))		// wait for the pulse to start
+    {
+        pulseBegin = ReadReg32(GPT_BASE, 0x58);
+        if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+        {
+            return NAN;
+        }
+    }
+
+    pulseBegin = ReadReg32(GPT_BASE, 0x58);
+
+    while (readInput(pin))		// wait for the pulse to stop
+    {
+        if (ReadReg32(GPT_BASE, 0x58) > timeoutMicroseconds)
+        {
+            return NAN;
+        }
+    }
+
+    pulseEnd = ReadReg32(GPT_BASE, 0x58);
+
+    // GPT_CTRL -> disable timer
+    WriteReg32(GPT_BASE, 0x50, 0x0);
+
+    return (pulseEnd - pulseBegin) / 58.0; //  29 / 2;
+}
+
 
 
 /* Define the test threads.  */
@@ -218,7 +357,6 @@ void    thread_1_entry(ULONG thread_input)
 
 UINT    status;
 
-
     /* This thread simply sends messages to a queue shared by thread 2.  */
     while(1)
     {
@@ -235,6 +373,8 @@ UINT    status;
 
         /* Increment the message sent.  */
         thread_1_messages_sent++;
+
+        distance_left = get_distance(HCSR04_LEFT, 100000);
     }
 }
 

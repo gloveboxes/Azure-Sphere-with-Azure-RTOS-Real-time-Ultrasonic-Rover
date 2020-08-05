@@ -75,7 +75,7 @@ void tx_application_define(void* first_unused_memory)
 	   /* Allocate the stack for thread 1.  */
 	tx_byte_allocate(&byte_pool_0, (VOID**)&pointer, DEMO_STACK_SIZE, TX_NO_WAIT);
 
-	tx_thread_create(&thread_measure_distance, "thread 1", thread_measure_distance_entry, 0,
+	tx_thread_create(&thread_measure_distance, "thread measure", thread_measure_distance_entry, 0,
 		pointer, DEMO_STACK_SIZE, 1, 1, TX_NO_TIME_SLICE, TX_AUTO_START);
 }
 
@@ -101,29 +101,6 @@ int gpio_output(u8 gpio_no, u8 level)
 	return 0;
 }
 
-void set_distance_indicator(ULTRASONIC_SENSOR *sensor)
-{
-	enum LEDS current_led = RED;
-
-	if (!isnan(sensor->centimeters))
-	{
-		current_led = sensor->centimeters > 20.0 ? GREEN : sensor->centimeters > 10.0 ? BLUE : RED;
-		if (sensor->previous_led != current_led)
-		{
-			gpio_output(sensor->LEDs[(int)sensor->previous_led], true); // turn off old current colour
-			sensor->previous_led = current_led;
-		}
-
-		gpio_output(sensor->LEDs[(int)current_led], false);
-	}
-	else
-	{
-		for (size_t i = 0; i < 3; i++)
-		{
-			gpio_output(sensor->LEDs[i], true);
-		}
-	}
-}
 
 // https://embeddedartistry.com/blog/2017/02/17/implementing-malloc-with-threadx/
 // overrides for malloc and free required for srand and rand
@@ -147,6 +124,7 @@ void *malloc(size_t size)
 	return ptr;
 }
 
+
 void free(void* ptr)
 {
 	if (ptr)
@@ -157,6 +135,30 @@ void free(void* ptr)
 	}
 }
 
+
+void set_distance_indicator(ULTRASONIC_SENSOR* sensor)
+{
+	enum LEDS current_led = RED;
+
+	if (!isnan(sensor->centimeters))
+	{
+		current_led = sensor->centimeters > 20.0 ? GREEN : sensor->centimeters > 10.0 ? BLUE : RED;
+		if (sensor->previous_led != current_led)
+		{
+			gpio_output(sensor->LEDs[(int)sensor->previous_led], true); // turn off old current colour
+			sensor->previous_led = current_led;
+		}
+
+		gpio_output(sensor->LEDs[(int)current_led], false);
+	}
+	else
+	{
+		for (size_t i = 0; i < 3; i++)
+		{
+			gpio_output(sensor->LEDs[i], true);
+		}
+	}
+}
 
 
 void thread_measure_distance_entry(ULONG thread_input)

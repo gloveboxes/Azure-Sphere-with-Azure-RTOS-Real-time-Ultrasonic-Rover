@@ -1,6 +1,6 @@
 # Sample: MT3620 real-time capability application using Azure RTOS
 
-This sample demonstrates how [Azure Sphere](https://azure.com/sphere) and [Azure RTOS](https://azure.com/rtos) are able to run together on MT3620 Development Kit.
+This sample demonstrates how [Azure Sphere](https://azure.com/sphere?WT.mc_id=iot-0000-dglover) and [Azure RTOS](https://azure.com/rtos?WT.mc_id=iot-0000-dglover) are able to run together on MT3620 Development Kit.
 
 This sample app for an MT3620 real-time core running Azure RTOS that creates several threads and repeatedly transmits message over a UART. These messages can be read in terminal application on a computer using a USB-to-serial adapter. By default, it uses the real-time core's dedicated UART, but if your hardware doesn't expose this UART's TX pin, then the sample can be altered to use a different UART.
 
@@ -12,7 +12,7 @@ git clone https://github.com/Azure-Samples/azure-sphere-and-azure-rtos-sample.gi
 
 ## Prerequisites
 
-1. [Seeed MT3620 Development Kit](https://aka.ms/azurespheredevkits) or other hardware that implements the [MT3620 Reference Development Board (RDB) design](https://docs.microsoft.com/azure-sphere/hardware/mt3620-reference-board-design).
+1. [Seeed MT3620 Development Kit](https://aka.ms/azurespheredevkits) or other hardware that implements the [MT3620 Reference Development Board (RDB) design](https://docs.microsoft.com/azure-sphere/hardware/mt3620-reference-board-design?WT.mc_id=iot-0000-dglover).
 
 1. A USB-to-serial adapter (for example, [FTDI Friend](https://www.digikey.com/catalog/en/partgroup/ftdi-friend/60311)) to connect the real-time core UART to a USB port on your computer.
 
@@ -90,9 +90,9 @@ See the following Azure Sphere Quickstarts to learn how to build and deploy this
 
 You need Azure Sphere SDK version >= 20.04 to build and run the sample.
   
--  [with Visual Studio](https://docs.microsoft.com/azure-sphere/install/qs-real-time-application)
--  [with VS Code on Windows or Linux](https://docs.microsoft.com/azure-sphere/install/qs-real-time-app-vscode)
--  [on the Windows or Linux command line](https://docs.microsoft.com/azure-sphere/install/qs-real-time-app-cli)
+-  [with Visual Studio](https://docs.microsoft.com/azure-sphere/install/qs-real-time-application?WT.mc_id=iot-0000-dglover)
+-  [with VS Code on Windows or Linux](https://docs.microsoft.com/azure-sphere/install/qs-real-time-app-vscode?WT.mc_id=iot-0000-dglover)
+-  [on the Windows or Linux command line](https://docs.microsoft.com/azure-sphere/install/qs-real-time-app-cli?WT.mc_id=iot-0000-dglover)
 
 ## Observe the output
 
@@ -102,6 +102,6 @@ The connected terminal emulator should display output from the `demo_threadx` pr
 
 ## References
 
-- [Set up your Windows PC for app development](https://docs.microsoft.com/en-ca/azure-sphere/install/development-environment-windows)
-- [Claim your device](https://docs.microsoft.com/en-ca/azure-sphere/install/claim-device)
-- [Update the OS on an early dev kit](https://docs.microsoft.com/en-ca/azure-sphere/resources/update-old-seeed-os)
+- [Set up your Windows PC for app development](https://docs.microsoft.com/azure-sphere/install/development-environment-windows?WT.mc_id=iot-0000-dglover)
+- [Claim your device](https://docs.microsoft.com/azure-sphere/install/claim-device?WT.mc_id=iot-0000-dglover)
+- [Update the OS on an early dev kit](https://docs.microsoft.com/azure-sphere/resources/update-old-seeed-os?WT.mc_id=iot-0000-dglover)
